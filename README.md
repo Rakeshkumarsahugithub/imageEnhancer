@@ -10,7 +10,7 @@ A powerful web-based application for downloading, enhancing, and optimizing imag
   - Supports JPG, PNG, GIF, BMP, WebP, and SVG formats
   - Real-time preview with before/after comparison
   - CORS handling for cross-origin images
-  - Automatic resizing of large images (max 2000px) while preserving quality
+
 
 ### 🎨 Image Enhancement Tools
 - **Precise Resizing**
