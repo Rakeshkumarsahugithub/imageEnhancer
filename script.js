@@ -1,6 +1,8 @@
 class ImageDownloader {
     constructor() {
         this.originalImage = null;
+        this.originalWidth = 0;
+        this.originalHeight = 0;
         this.canvas = null;
         this.ctx = null;
         this.currentFilters = {
@@ -8,8 +10,16 @@ class ImageDownloader {
             brightness: 1,
             contrast: 1,
             saturation: 1,
-            sharpness: 0
+            sharpness: 0,
+            quality: 0.85,
+            format: 'jpeg',
+            customWidth: null,
+            customHeight: null
         };
+        this.debounceTimers = {};
+        this.rafId = null;
+        this.maintainAspectRatio = true;
+        this.maxDimension = 2000; // Max dimension for preprocessing
         
         this.initializeElements();
         this.bindEvents();
@@ -37,18 +47,50 @@ class ImageDownloader {
             contrastSlider: document.getElementById('contrastSlider'),
             saturationSlider: document.getElementById('saturationSlider'),
             sharpnessSlider: document.getElementById('sharpnessSlider'),
+            qualitySlider: document.getElementById('qualitySlider'),
+            
+            // Resize controls
+            widthInput: document.getElementById('widthInput'),
+            heightInput: document.getElementById('heightInput'),
+            applyResize: document.getElementById('applyResize'),
+            originalDimensions: document.getElementById('originalDimensions'),
             
             // Value displays
             scaleValue: document.getElementById('scaleValue'),
             brightnessValue: document.getElementById('brightnessValue'),
             contrastValue: document.getElementById('contrastValue'),
             saturationValue: document.getElementById('saturationValue'),
-            sharpnessValue: document.getElementById('sharpnessValue')
+            sharpnessValue: document.getElementById('sharpnessValue'),
+            qualityValue: document.getElementById('qualityValue')
         };
 
         this.canvas = this.elements.enhancedCanvas;
         // Enable willReadFrequently for better performance with multiple getImageData calls
         this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        
+        // Initialize sliders with proper styling
+        this.initializeSliders();
+    }
+
+    initializeSliders() {
+        const sliders = [
+            'scaleSlider',
+            'brightnessSlider',
+            'contrastSlider',
+            'saturationSlider',
+            'sharpnessSlider'
+        ];
+        
+        sliders.forEach(id => {
+            const slider = this.elements[id];
+            if (slider) {
+                // Add initial fill style
+                slider.style.setProperty('--fill-percent', '0%');
+                
+                // Add touch-action to prevent page scrolling
+                slider.style.touchAction = 'none';
+            }
+        });
     }
 
     bindEvents() {
@@ -59,6 +101,32 @@ class ImageDownloader {
         this.elements.imageUrl.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.loadImage();
         });
+
+        // Format selection change
+        this.elements.formatSelect = document.getElementById('formatSelect');
+        this.elements.qualityControl = document.getElementById('qualityControl');
+        
+        this.elements.formatSelect.addEventListener('change', (e) => {
+            this.currentFilters.format = e.target.value;
+            // Hide quality control for PDF
+            this.elements.qualityControl.style.display = 
+                e.target.value === 'pdf' ? 'none' : 'flex';
+        });
+        
+        // Initialize format
+        this.currentFilters.format = this.elements.formatSelect.value;
+        
+        // Resize controls
+        this.elements.widthInput.addEventListener('change', (e) => this.handleDimensionChange('width', e.target.value));
+        this.elements.heightInput.addEventListener('change', (e) => this.handleDimensionChange('height', e.target.value));
+        this.elements.applyResize.addEventListener('click', () => this.applyCustomDimensions());
+        
+        // Quality slider
+        this.setupSlider('qualitySlider', (value) => {
+            const quality = parseInt(value);
+            this.elements.qualityValue.textContent = `${quality}%`;
+            return quality / 100;
+        }, 'quality');
 
         // File upload handling
         this.elements.uploadImage = document.getElementById('uploadImage');
@@ -77,36 +145,36 @@ class ImageDownloader {
             }
         });
 
-        // Slider events
-        this.elements.scaleSlider.addEventListener('input', (e) => {
-            this.currentFilters.scale = parseFloat(e.target.value);
-            this.elements.scaleValue.textContent = `${e.target.value}x`;
-            this.applyEnhancements();
-        });
+        // Setup slider with debouncing and visual feedback
+        this.setupSlider('scaleSlider', (value) => {
+            const roundedValue = parseFloat(value).toFixed(1);
+            this.elements.scaleValue.textContent = `${roundedValue}x`;
+            return parseFloat(roundedValue);
+        }, 'scale');
 
-        this.elements.brightnessSlider.addEventListener('input', (e) => {
-            this.currentFilters.brightness = parseFloat(e.target.value);
-            this.elements.brightnessValue.textContent = `${Math.round(e.target.value * 100)}%`;
-            this.applyEnhancements();
-        });
+        this.setupSlider('brightnessSlider', (value) => {
+            const percent = Math.round(parseFloat(value) * 100);
+            this.elements.brightnessValue.textContent = `${percent}%`;
+            return parseFloat(value);
+        }, 'brightness');
 
-        this.elements.contrastSlider.addEventListener('input', (e) => {
-            this.currentFilters.contrast = parseFloat(e.target.value);
-            this.elements.contrastValue.textContent = `${Math.round(e.target.value * 100)}%`;
-            this.applyEnhancements();
-        });
+        this.setupSlider('contrastSlider', (value) => {
+            const percent = Math.round(parseFloat(value) * 100);
+            this.elements.contrastValue.textContent = `${percent}%`;
+            return parseFloat(value);
+        }, 'contrast');
 
-        this.elements.saturationSlider.addEventListener('input', (e) => {
-            this.currentFilters.saturation = parseFloat(e.target.value);
-            this.elements.saturationValue.textContent = `${Math.round(e.target.value * 100)}%`;
-            this.applyEnhancements();
-        });
+        this.setupSlider('saturationSlider', (value) => {
+            const percent = Math.round(parseFloat(value) * 100);
+            this.elements.saturationValue.textContent = `${percent}%`;
+            return parseFloat(value);
+        }, 'saturation');
 
-        this.elements.sharpnessSlider.addEventListener('input', (e) => {
-            this.currentFilters.sharpness = parseFloat(e.target.value);
-            this.elements.sharpnessValue.textContent = `${Math.round(e.target.value * 100)}%`;
-            this.applyEnhancements();
-        });
+        this.setupSlider('sharpnessSlider', (value) => {
+            const percent = Math.round(parseFloat(value) * 100);
+            this.elements.sharpnessValue.textContent = `${percent}%`;
+            return parseFloat(value);
+        }, 'sharpness');
 
         // Filter buttons
         document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -122,6 +190,60 @@ class ImageDownloader {
         this.elements.downloadImage.addEventListener('click', () => this.downloadImage());
     }
 
+    setupSlider(sliderId, formatValue, filterKey) {
+        const slider = this.elements[sliderId];
+        
+        // Update slider fill color
+        const updateFill = () => {
+            const value = parseFloat(slider.value);
+            const min = parseFloat(slider.min);
+            const max = parseFloat(slider.max);
+            const percent = ((value - min) / (max - min)) * 100;
+            slider.style.setProperty('--fill-percent', `${percent}%`);
+        };
+        
+        // Initial fill
+        updateFill();
+        
+        const updateValue = (value) => {
+            const formattedValue = formatValue(value);
+            this.currentFilters[filterKey] = formattedValue;
+            
+            clearTimeout(this.debounceTimers[sliderId]);
+            this.debounceTimers[sliderId] = setTimeout(() => {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = requestAnimationFrame(() => {
+                    this.applyEnhancements();
+                });
+            }, 100);
+        };
+        
+        slider.addEventListener('input', (e) => {
+            updateFill();
+            updateValue(e.target.value);
+        });
+        
+        slider.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { passive: true });
+    }
+
+    cleanup() {
+        // Clean up previous resources
+        if (this.originalImage && this.originalImage.src) {
+            URL.revokeObjectURL(this.originalImage.src);
+        }
+        
+        // Clear any pending operations
+        Object.values(this.debounceTimers).forEach(timer => clearTimeout(timer));
+        cancelAnimationFrame(this.rafId);
+        
+        // Reset canvas if it exists
+        if (this.canvas && this.ctx) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+    }
+
     async loadImage() {
         const url = this.elements.imageUrl.value.trim();
         
@@ -134,6 +256,9 @@ class ImageDownloader {
             this.showError('Please enter a valid image URL (must be .jpg, .jpeg, .png, .gif, .bmp, .webp, or .svg)');
             return;
         }
+        
+        // Clean up previous resources
+        this.cleanup();
 
         // Reset UI
         this.elements.enhancementControls.style.display = 'none';
@@ -215,7 +340,59 @@ class ImageDownloader {
         }
     }
 
-    handleFileUpload(file) {
+    calculateAspectRatio(srcWidth, srcHeight, maxWidth, maxHeight) {
+        const ratio = Math.min(
+            maxWidth / srcWidth,
+            maxHeight / srcHeight,
+            1 // Don't scale up
+        );
+        return {
+            width: Math.round(srcWidth * ratio),
+            height: Math.round(srcHeight * ratio)
+        };
+    }
+
+    async preprocessImage(file) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            
+            img.onload = () => {
+                const { width, height } = this.calculateAspectRatio(
+                    img.width,
+                    img.height,
+                    this.maxDimension,
+                    this.maxDimension
+                );
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const format = file.type.split('/')[1] || 'jpeg';
+                const mimeType = `image/${format}`;
+                
+                canvas.toBlob((blob) => {
+                    URL.revokeObjectURL(url);
+                    resolve({
+                        blob,
+                        width,
+                        height,
+                        mimeType
+                    });
+                }, mimeType, 0.85);
+            };
+            
+            img.src = url;
+        });
+    }
+
+    async handleFileUpload(file) {
         if (!file.type.match('image.*')) {
             this.showError('Please select a valid image file (JPEG, PNG, GIF, etc.)');
             return;
@@ -224,9 +401,13 @@ class ImageDownloader {
         this.showLoading(true);
         this.hideError();
 
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
+        try {
+            // Clean up previous resources
+            this.cleanup();
+            
+            // Preprocess image (resize and compress)
+            const { blob, width, height } = await this.preprocessImage(file);
+            
             const img = new Image();
             img.onload = () => {
                 this.originalImage = img;
@@ -238,19 +419,18 @@ class ImageDownloader {
                 // Clear the file input
                 this.elements.fileInput.value = '';
             };
+            
             img.onerror = () => {
                 this.showError('Error loading the selected image. Please try another file.');
                 this.showLoading(false);
             };
-            img.src = e.target.result;
-        };
-        
-        reader.onerror = () => {
-            this.showError('Error reading the selected file. Please try again.');
+            
+            img.src = URL.createObjectURL(blob);
+        } catch (error) {
+            console.error('Error processing image:', error);
+            this.showError('Error processing the selected file. Please try again.');
             this.showLoading(false);
-        };
-        
-        reader.readAsDataURL(file);
+        }
     }
 
     needsProxy(url) {
@@ -264,14 +444,41 @@ class ImageDownloader {
     }
 
     displayOriginalImage() {
+        this.originalWidth = this.originalImage.naturalWidth;
+        this.originalHeight = this.originalImage.naturalHeight;
+        
         this.elements.originalImage.src = this.originalImage.src;
-        this.elements.originalSize.textContent = `${this.originalImage.naturalWidth} × ${this.originalImage.naturalHeight}px`;
+        this.elements.originalSize.textContent = `${this.originalWidth} × ${this.originalHeight}px`;
+        this.elements.originalDimensions.textContent = `(Original: ${this.originalWidth}×${this.originalHeight})`;
+        
+        // Update dimension inputs
+        this.elements.widthInput.placeholder = this.originalWidth;
+        this.elements.heightInput.placeholder = this.originalHeight;
+        this.elements.widthInput.value = '';
+        this.elements.heightInput.value = '';
+        
+        // Reset custom dimensions
+        this.currentFilters.customWidth = null;
+        this.currentFilters.customHeight = null;
     }
 
     setupCanvas() {
         const scale = this.currentFilters.scale;
-        this.canvas.width = this.originalImage.naturalWidth * scale;
-        this.canvas.height = this.originalImage.naturalHeight * scale;
+        let width = this.originalWidth;
+        let height = this.originalHeight;
+        
+        // Apply custom dimensions if set
+        if (this.currentFilters.customWidth || this.currentFilters.customHeight) {
+            width = this.currentFilters.customWidth || (this.currentFilters.customHeight * (this.originalWidth / this.originalHeight));
+            height = this.currentFilters.customHeight || (this.currentFilters.customWidth * (this.originalHeight / this.originalWidth));
+        } else {
+            // Apply scale factor
+            width *= scale;
+            height *= scale;
+        }
+        
+        this.canvas.width = Math.round(width);
+        this.canvas.height = Math.round(height);
         
         // Update enhanced size display
         this.elements.enhancedSize.textContent = `${this.canvas.width} × ${this.canvas.height}px`;
@@ -280,32 +487,38 @@ class ImageDownloader {
     applyEnhancements() {
         if (!this.originalImage) return;
 
-        this.setupCanvas();
-        
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Apply filters
-        this.ctx.filter = this.buildFilterString();
-        
-        // Draw scaled image
-        this.ctx.drawImage(
-            this.originalImage,
-            0, 0,
-            this.originalImage.naturalWidth,
-            this.originalImage.naturalHeight,
-            0, 0,
-            this.canvas.width,
-            this.canvas.height
-        );
+        // Use requestAnimationFrame for smoother animations
+        cancelAnimationFrame(this.rafId);
+        this.rafId = requestAnimationFrame(() => {
+            this.setupCanvas();
+            
+            // Clear canvas
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // Apply filters
+            this.ctx.filter = this.buildFilterString();
+            
+            // Draw scaled image
+            this.ctx.drawImage(
+                this.originalImage,
+                0, 0,
+                this.originalImage.naturalWidth,
+                this.originalImage.naturalHeight,
+                0, 0,
+                this.canvas.width,
+                this.canvas.height
+            );
 
-        // Apply sharpening if needed
-        if (this.currentFilters.sharpness > 0) {
-            this.applySharpeningFilter();
-        }
+            // Apply sharpening if needed (defer to next frame)
+            if (this.currentFilters.sharpness > 0) {
+                requestIdleCallback(() => {
+                    this.applySharpeningFilter();
+                }, { timeout: 100 });
+            }
 
-        // Reset filter for future operations
-        this.ctx.filter = 'none';
+            // Reset filter for future operations
+            this.ctx.filter = 'none';
+        });
     }
 
     buildFilterString() {
@@ -392,31 +605,6 @@ class ImageDownloader {
         }
     }
 
-    setFilters(filters) {
-        Object.assign(this.currentFilters, filters);
-        this.updateSliders();
-        this.applyEnhancements();
-    }
-
-    updateSliders() {
-        const { scale, brightness, contrast, saturation, sharpness } = this.currentFilters;
-        
-        this.elements.scaleSlider.value = scale;
-        this.elements.scaleValue.textContent = `${scale}x`;
-        
-        this.elements.brightnessSlider.value = brightness;
-        this.elements.brightnessValue.textContent = `${Math.round(brightness * 100)}%`;
-        
-        this.elements.contrastSlider.value = contrast;
-        this.elements.contrastValue.textContent = `${Math.round(contrast * 100)}%`;
-        
-        this.elements.saturationSlider.value = saturation;
-        this.elements.saturationValue.textContent = `${Math.round(saturation * 100)}%`;
-        
-        this.elements.sharpnessSlider.value = sharpness;
-        this.elements.sharpnessValue.textContent = `${Math.round(sharpness * 100)}%`;
-    }
-
     applySepia() {
         const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         const data = imageData.data;
@@ -435,6 +623,7 @@ class ImageDownloader {
     }
 
     resetFilters() {
+        // Reset all filters to default values
         this.currentFilters = {
             scale: 1,
             brightness: 1,
@@ -442,43 +631,139 @@ class ImageDownloader {
             saturation: 1,
             sharpness: 0
         };
-        
-        this.updateSliders();
+
+        // Reset sliders and update their visual state
+        const sliders = {
+            scaleSlider: { value: 1, display: '1x' },
+            brightnessSlider: { value: 1, display: '100%' },
+            contrastSlider: { value: 1, display: '100%' },
+            saturationSlider: { value: 1, display: '100%' },
+            sharpnessSlider: { value: 0, display: '0%' }
+        };
+
+        Object.entries(sliders).forEach(([id, { value, display }]) => {
+            const slider = this.elements[id];
+            if (slider) {
+                slider.value = value;
+                // Trigger input event to update fill
+                slider.dispatchEvent(new Event('input'));
+            }
+            
+            // Update display values
+            const displayElement = document.getElementById(id.replace('Slider', 'Value'));
+            if (displayElement) {
+                displayElement.textContent = display;
+            }
+        });
+
+        // Apply the reset filters
         this.applyEnhancements();
-        
-        // Reset active filter button
-        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('.filter-btn[data-filter="none"]').classList.add('active');
     }
 
+    handleDimensionChange(dimension, value) {
+        if (!value) return;
+        
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 1) return;
+        
+        if (this.maintainAspectRatio && this.originalWidth && this.originalHeight) {
+            const ratio = this.originalWidth / this.originalHeight;
+            
+            if (dimension === 'width') {
+                const newHeight = Math.round(numValue / ratio);
+                this.elements.heightInput.value = newHeight;
+            } else {
+                const newWidth = Math.round(numValue * ratio);
+                this.elements.widthInput.value = newWidth;
+            }
+        }
+    }
+    
+    applyCustomDimensions() {
+        const width = this.elements.widthInput.value ? parseInt(this.elements.widthInput.value) : null;
+        const height = this.elements.heightInput.value ? parseInt(this.elements.heightInput.value) : null;
+        
+        if ((width && width < 10) || (height && height < 10)) {
+            this.showError('Dimensions must be at least 10px');
+            return;
+        }
+        
+        this.currentFilters.customWidth = width;
+        this.currentFilters.customHeight = height;
+        
+        // If only one dimension is provided, calculate the other to maintain aspect ratio
+        if (width && !height && this.originalWidth && this.originalHeight) {
+            this.currentFilters.customHeight = Math.round((width / this.originalWidth) * this.originalHeight);
+            this.elements.heightInput.value = this.currentFilters.customHeight;
+        } else if (height && !width && this.originalWidth && this.originalHeight) {
+            this.currentFilters.customWidth = Math.round((height / this.originalHeight) * this.originalWidth);
+            this.elements.widthInput.value = this.currentFilters.customWidth;
+        }
+        
+        this.applyEnhancements();
+    }
+    
+    async exportAsPDF(link, fileName) {
+        try {
+            // Use the jsPDF library (loaded from CDN)
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: this.canvas.width > this.canvas.height ? 'l' : 'p',
+                unit: 'px',
+                format: [this.canvas.width, this.canvas.height]
+            });
+            
+            // Convert canvas to image data
+            const imgData = this.canvas.toDataURL('image/jpeg', 0.9);
+            
+            // Add image to PDF
+            pdf.addImage(imgData, 'JPEG', 0, 0, this.canvas.width, this.canvas.height);
+            
+            // Save the PDF
+            pdf.save(fileName);
+            
+        } catch (error) {
+            console.error('PDF export error:', error);
+            this.showError('Error creating PDF: ' + error.message);
+        }
+    }
+    
     downloadImage() {
         if (!this.canvas) {
             this.showError('No enhanced image to download');
             return;
         }
+        
+        const quality = this.currentFilters.quality || 0.85;
+        const format = this.currentFilters.format || 'jpeg';
+        const mimeType = format === 'pdf' ? 'application/pdf' : `image/${format}`;
+        const fileName = `image-${new Date().getTime()}.${format === 'jpg' ? 'jpeg' : format}`;
 
         try {
-            // Create download link
             const link = document.createElement('a');
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `enhanced-image-${timestamp}.png`;
+            link.download = fileName;
             
-            // Convert canvas to blob and create download URL
+            if (format === 'pdf') {
+                this.exportAsPDF(link, fileName);
+                return;
+            }
+            
+            // For image formats
             this.canvas.toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 link.href = url;
-                link.download = filename;
-                
-                // Trigger download
                 document.body.appendChild(link);
                 link.click();
-                document.body.removeChild(link);
                 
                 // Clean up
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-            }, 'image/png', 1.0);
-
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }, 0);
+            }, mimeType, quality);
+            
         } catch (error) {
+            console.error('Download error:', error);
             this.showError('Error downloading image: ' + error.message);
         }
     }

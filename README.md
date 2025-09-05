@@ -1,6 +1,6 @@
 # 🖼️ Image Downloader & Enhancer
 
-A powerful web-based application for downloading, enhancing, and optimizing images with real-time previews and advanced editing capabilities. Built with modern web technologies for a seamless user experience.
+A powerful web-based application for downloading, enhancing, and optimizing images with real-time previews and advanced editing capabilities. Built with modern web technologies for a seamless user experience across all devices.
 
 ## ✨ Features
 
@@ -10,17 +10,20 @@ A powerful web-based application for downloading, enhancing, and optimizing imag
   - Supports JPG, PNG, GIF, BMP, WebP, and SVG formats
   - Real-time preview with before/after comparison
   - CORS handling for cross-origin images
+  - Automatic resizing of large images (max 2000px) while preserving quality
 
 ### 🎨 Image Enhancement Tools
-- **Scaling**
-  - Upscale images up to 4x original resolution
-  - Maintains image quality during resizing
+- **Precise Resizing**
+  - Set exact pixel dimensions with aspect ratio locking
+  - Real-time dimension preview
+  - Maintains image quality during transformations
   
 - **Adjustment Controls**
-  - Brightness: Fine-tune image lightness
-  - Contrast: Enhance or reduce image contrast
-  - Saturation: Control color intensity
-  - Sharpness: Add crispness to image details
+  - Brightness: Fine-tune image lightness (0-200%)
+  - Contrast: Enhance or reduce image contrast (0-200%)
+  - Saturation: Control color intensity (0-200%)
+  - Sharpness: Add crispness to image details (0-100%)
+  - Quality: Adjust output quality for optimal file size (10-100%)
 
 ### ⚡ Quick Filters
 - Instant one-click presets:
@@ -30,19 +33,27 @@ A powerful web-based application for downloading, enhancing, and optimizing imag
   - Vintage: Retro film look
   - High Contrast: Dramatic, bold appearance
 
-### 💾 Save & Export
-- Download enhanced images in original or PNG format
-- Preserve transparency (for PNG/GIF with alpha channel)
-- Maintains EXIF data when available
+### 💾 Save & Export Options
+- **Multiple Formats**
+  - JPEG: Best for photos and web images
+  - PNG: For images requiring transparency
+  - PDF: High-quality document format
+  
+- **Quality Control**
+  - Adjustable quality settings for optimal file size
+  - Preserves transparency (for PNG)
+  - Maintains EXIF data when available
+  - Automatic file naming with timestamps
 
 ## 🛠️ Technologies Used
 
 ### Frontend
 - **HTML5** - Semantic markup and structure
-- **CSS3** - Responsive design with modern animations
-- **JavaScript (ES6+)** - Core application logic
-- **Canvas API** - Real-time image processing
-- **File API** - Local file handling
+- **CSS3** - Responsive design with modern animations and transitions
+- **JavaScript (ES6+)** - Core application logic with modern features
+- **Canvas API** - Real-time image processing and manipulation
+- **File API** - Local file handling and processing
+- **jsPDF** - Client-side PDF generation
 
 ### Key Libraries & APIs
 - **HTML5 Canvas** - For image manipulation and rendering
@@ -153,10 +164,16 @@ imagedownloader/
    - Contrast: 120% for more definition
    - Sharpness: 50% for crisp details
 
-2. **Artistic Effects**
-   - Apply "Vintage" filter for retro look
-   - Use "Sepia" for classic photography style
-   - Try "Vibrant" for social media posts
+2. **Export Options**
+   - Use JPEG for photos and web images (smaller file size)
+   - Choose PNG when transparency is needed
+   - Select PDF for documents or high-quality prints
+   - Adjust quality slider to optimize file size vs. quality
+
+3. **Performance Tips**
+   - For large images, use the resize feature before applying filters
+   - The app automatically optimizes images for web use
+   - Use the quality slider to reduce file size for web sharing
 
 ## Limitations
 
@@ -174,4 +191,3 @@ imagedownloader/
 ---
 
 **Note**: This application runs entirely in the browser - no server required!
-#

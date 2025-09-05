@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Downloader & Enhancer</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -31,32 +32,57 @@
             <h3>Enhancement Options</h3>
             
             <div class="control-group">
+                <label for="widthInput">Width (px):</label>
+                <input type="number" id="widthInput" min="100" step="1" placeholder="Original">
+                <span>×</span>
+                <label for="heightInput" style="margin-left: 10px;">Height (px):</label>
+                <input type="number" id="heightInput" min="100" step="1" placeholder="Original">
+                <button id="applyResize" class="btn btn-small">Apply</button>
+                <span id="originalDimensions" class="dimension-hint"></span>
+            </div>
+            
+            <div class="control-group">
+                <label for="formatSelect">Output Format:</label>
+                <select id="formatSelect" class="format-select">
+                    <option value="jpeg" selected>JPEG (.jpg)</option>
+                    <option value="png">PNG (.png)</option>
+                    <option value="pdf">PDF (.pdf)</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="qualityControl">
+                <label for="qualitySlider">Quality:</label>
+                <input type="range" id="qualitySlider" min="10" max="100" value="85" step="1">
+                <span id="qualityValue">85%</span>
+            </div>
+            
+            <div class="control-group">
                 <label for="scaleSlider">Scale Factor:</label>
-                <input type="range" id="scaleSlider" min="1" max="4" value="1" step="0.5">
+                <input type="range" id="scaleSlider" min="1" max="4" value="1" step="0.1">
                 <span id="scaleValue">1x</span>
             </div>
 
             <div class="control-group">
                 <label for="brightnessSlider">Brightness:</label>
-                <input type="range" id="brightnessSlider" min="0.5" max="2" value="1" step="0.1">
+                <input type="range" id="brightnessSlider" min="0" max="2" value="1" step="0.01">
                 <span id="brightnessValue">100%</span>
             </div>
 
             <div class="control-group">
                 <label for="contrastSlider">Contrast:</label>
-                <input type="range" id="contrastSlider" min="0.5" max="2" value="1" step="0.1">
+                <input type="range" id="contrastSlider" min="0" max="2" value="1" step="0.01">
                 <span id="contrastValue">100%</span>
             </div>
 
             <div class="control-group">
                 <label for="saturationSlider">Saturation:</label>
-                <input type="range" id="saturationSlider" min="0" max="2" value="1" step="0.1">
+                <input type="range" id="saturationSlider" min="0" max="2" value="1" step="0.01">
                 <span id="saturationValue">100%</span>
             </div>
 
             <div class="control-group">
                 <label for="sharpnessSlider">Sharpness:</label>
-                <input type="range" id="sharpnessSlider" min="0" max="2" value="0" step="0.1">
+                <input type="range" id="sharpnessSlider" min="0" max="2" value="0" step="0.01">
                 <span id="sharpnessValue">0%</span>
             </div>
 
