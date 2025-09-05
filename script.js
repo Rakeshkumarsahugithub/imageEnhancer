@@ -585,22 +585,55 @@ class ImageDownloader {
     }
 
     applyPresetFilter(filterType) {
+        // Update slider UI to match the preset
+        const updateSlider = (id, value) => {
+            const slider = document.getElementById(id);
+            if (slider) {
+                slider.value = value;
+                // Trigger the input event to update the display
+                const event = new Event('input', { bubbles: true });
+                slider.dispatchEvent(event);
+            }
+        };
+
         switch (filterType) {
             case 'none':
                 this.resetFilters();
                 break;
             case 'vintage':
-                this.setFilters({ brightness: 1.1, contrast: 1.2, saturation: 0.8 });
+                this.currentFilters.brightness = 1.1;
+                this.currentFilters.contrast = 1.2;
+                this.currentFilters.saturation = 0.8;
+                updateSlider('brightnessSlider', 1.1);
+                updateSlider('contrastSlider', 1.2);
+                updateSlider('saturationSlider', 0.8);
+                this.applyEnhancements();
                 break;
             case 'blackwhite':
-                this.setFilters({ saturation: 0, contrast: 1.2 });
+                this.currentFilters.saturation = 0;
+                this.currentFilters.contrast = 1.2;
+                updateSlider('saturationSlider', 0);
+                updateSlider('contrastSlider', 1.2);
+                this.applyEnhancements();
                 break;
             case 'sepia':
-                this.setFilters({ brightness: 1.1, contrast: 1.1, saturation: 0.6 });
+                this.currentFilters.brightness = 1.1;
+                this.currentFilters.contrast = 1.1;
+                this.currentFilters.saturation = 0.6;
+                updateSlider('brightnessSlider', 1.1);
+                updateSlider('contrastSlider', 1.1);
+                updateSlider('saturationSlider', 0.6);
+                this.applyEnhancements();
                 this.applySepia();
                 break;
             case 'vibrant':
-                this.setFilters({ brightness: 1.1, contrast: 1.3, saturation: 1.4 });
+                this.currentFilters.brightness = 1.1;
+                this.currentFilters.contrast = 1.3;
+                this.currentFilters.saturation = 1.4;
+                updateSlider('brightnessSlider', 1.1);
+                updateSlider('contrastSlider', 1.3);
+                updateSlider('saturationSlider', 1.4);
+                this.applyEnhancements();
                 break;
         }
     }
@@ -854,8 +887,16 @@ document.addEventListener('DOMContentLoaded', () => {
     inputSection.appendChild(buttonContainer);
     
     sampleButton.addEventListener('click', () => {
+        const urlInput = document.getElementById('imageUrl');
+        // Force blur and focus to ensure any pending changes are processed
+        urlInput.blur();
         const randomUrl = sampleUrls[Math.floor(Math.random() * sampleUrls.length)];
-        document.getElementById('imageUrl').value = randomUrl;
+        urlInput.value = randomUrl;
+        // Trigger input event to ensure any listeners are notified
+        const event = new Event('input', { bubbles: true });
+        urlInput.dispatchEvent(event);
+        // Focus back to the input for better UX
+        urlInput.focus();
     });
     
     // Show notification when image is uploaded
